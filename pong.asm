@@ -3,8 +3,8 @@
 
 .data
 message db "hello world",0dh,0ah,'$'
-ball_posx dw 0ah    ;ball position x
-ball_posy dw 0ah    ;ball pos y
+ball_posx dw 0a0h    ;ball position x
+ball_posy dw 0a0h    ;ball pos y
 ball_dimension dw 05h    ; 5 x 5 pixels
 ball_vx dw 01h  ;velocity of x pos
 ball_vy dw 01h  ;velocity of y pos
@@ -18,6 +18,7 @@ screenheight dw 200
 bat_width dw 10
 bat_height dw 50
 bat_color db 0fh
+bat_vy dw 05h
 
 ;left side bat
 bat_posx_left dw 10  ;pos x = width for left handside
@@ -40,13 +41,16 @@ main proc
 
 gameloop:
     update_delay:       ;prevent the ball from moving too fast
-        cmp counter , 60
+        cmp counter , 10
         jg update
         inc counter
         ;rendering of the ball and bats should go below here.
-        call renderball
-        ;call renderbats
-        call renderbatsleft
+        call renderball     ;render ball
+        call renderbatLHS   ;render lhs bat
+        call renderbatRHS   ;render rhs bat
+        call userLHSinput   
+        call userRHSinput
+        
         jmp update_delay
 
     ;while(not quit)
@@ -56,6 +60,7 @@ gameloop:
     ;check quit()
     update:
         mov counter , 0
+        
         call moveball
         call clearscreen
         jmp gameloop
@@ -97,8 +102,7 @@ ret
 renderball endp
 
 
-renderbats proc ;render the bats
-
+renderbatLHS proc ;render the left hand side bat
     mov dx , bat_posy_left  ;initialize ball position
     mov cx , bat_posx_left  ;iniitalize ball position
 
@@ -107,7 +111,7 @@ renderbat_y_left:
         mov ax, bat_posy_left 
         add ax , bat_height
         cmp dx , ax            ;if (dx == bat_posy+bat_dimension) 
-        je finishrenderbats       ;go ahead and render the other bat
+        je finishrenderbatLHS       ;go ahead and render the other bat
         sub cx , cx                 ;clear register
         mov cx , bat_posx_left      ;reiniitalize position of xpos
         mov ah,0ch                  ;read graphics pixels
@@ -128,25 +132,22 @@ renderbat_y_left:
                jne renderbat_x_left ;if (cx != 0 (since bat pos is top right), repeat.)
                je renderbat_y_left  ;else go back to render y
 
-
 ;render the right hand side bat
+    
+
+finishrenderbatLHS:
+ret
+renderbatLHS endp
+
+renderbatRHS proc  ;render the right hand side bat
     mov dx , bat_posy_right  ;initialize ball position
     mov cx , bat_posx_right  ;iniitalize ball position
-
-
-finishrenderbats:
-ret
-renderbats endp
-
-
-renderbatsleft proc
-
 renderbat_y_right:
         sub ax,ax           ;clear register
         mov ax, bat_posy_right 
         add ax , bat_height
         cmp dx , ax            ;if (dx == bat_posy+bat_dimension) 
-        je finishrenderbatsright       ;else loop is ,rendering completed for both bats
+        je finishrenderbatRHS ;else loop is ,rendering completed for both bats
         sub cx , cx            ;clear register
         mov cx , bat_posx_right      ;reiniitalize position of xpos
         mov ah,0ch              ;read graphics pixels
@@ -154,7 +155,6 @@ renderbat_y_right:
         mov bh, 00h             
         inc dx      
         int 10h 
-        
         renderbat_x_right:
                mov ah,0ch  ;read graphics pixels
                mov al,bat_color  ;set color of ball
@@ -167,9 +167,9 @@ renderbat_y_right:
                jne renderbat_x_right ;if (cx != screenwidth , repeat.)
                je renderbat_y_right  ;else go back to render y
 
-finishrenderbatsright:
+finishrenderbatRHS:
 ret
-renderbatsleft endp
+renderbatRHS endp
 
 moveball proc
     mov ax,ball_vx  
@@ -179,6 +179,79 @@ moveball proc
     ret
 moveball endp
 
+userLHSinput proc
+
+    mov ah , 01h    ;check if any keys are pressed, prevents blocking
+    int 16h
+    jz exitLHSinput
+
+    mov ah,00h
+    int 16h ;poll for keyboard input, the ascii input is stored in al register
+    cmp al, 077h    ;077h = ascii for 'w'
+    je  movebatupLHS
+    cmp al, 073h    ;073h ascii for 's'
+    jne exitLHSinput
+    je movebatdownLHS
+    
+exitLHSinput:
+ret
+userLHSinput endp
+
+movebatupLHS proc
+    cmp bat_posy_left , 0
+    je exitmovebatupLHS
+    mov ax , bat_vy   
+    sub bat_posy_left , ax  ;posy_up -= bat_vy (y coordinates are 0,0 top left)
+    
+exitmovebatupLHS:
+    ret
+movebatupLHS endp
+
+movebatdownLHS proc
+    mov ax , screenheight   
+    sub ax,bat_height       ;screenheight - bat height
+    cmp bat_posy_left , ax ;if (batposy >= screenheright - bat height)
+    jge exitmovebatdownLHS
+    mov ax , bat_vy    
+    add bat_posy_left , ax  ;posy_down -= ball_vy (y coordinates are 0,0 top left)
+
+exitmovebatdownLHS:
+    ret
+movebatdownLHS endp
+
+userRHSinput proc
+    cmp al, 06fh    ;077h = ascii for 'o'
+    je  movebatupRHS
+    cmp al, 06ch    ;073h ascii for 'l'
+    jne exitRHSinput
+    je movebatdownRHS
+    
+exitRHSinput:
+ret
+userRHSinput endp
+
+movebatupRHS proc
+  
+    cmp bat_posy_right , 0  ;clamp position to zero
+    je  exitmovebatupRHS
+    mov ax , bat_vy  
+    sub bat_posy_right , ax  ;posy_up -= bat_vy (y coordinates are 0,0 top left)
+
+exitmovebatupRHS:
+    ret
+movebatupRHS endp
+
+movebatdownRHS proc
+    mov ax , screenheight   
+    sub ax,bat_height       ;screenheight - bat height
+    cmp bat_posy_right , ax ;if (batposy >= screenheright - bat height)
+    jge exitmovebatdownRHS
+    mov ax , bat_vy    
+    add bat_posy_right , ax  ;posy_down -= ball_vy (y coordinates are 0,0 top left)
+    
+exitmovebatdownRHS:
+    ret
+movebatdownRHS endp
 
 clearscreen proc ;clear screen
     mov ah,00h
