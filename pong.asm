@@ -29,8 +29,6 @@ bat_posx_right dw 310  ;pos x = width for left handside = (screenwidth - bat_wid
 bat_posy_right dw 75    ;initialize bat to center of screen (screenheight - height) / 2
 
 counter dw 0            ;coutner fro game loop delay
-
-
 .code 
 
 main proc 
@@ -50,7 +48,6 @@ gameloop:
         call renderbatRHS   ;render rhs bat
         call userLHSinput   
         call userRHSinput
-        
         jmp update_delay
 
     ;while(not quit)
@@ -62,6 +59,7 @@ gameloop:
         mov counter , 0
         
         call moveball
+        call checkcollision
         call clearscreen
         jmp gameloop
 main endp
@@ -197,8 +195,8 @@ exitLHSinput:
 ret
 userLHSinput endp
 
-movebatupLHS proc
-    cmp bat_posy_left , 0
+movebatupLHS proc   
+    cmp bat_posy_left , 0   ;if (batpost == 0)
     je exitmovebatupLHS
     mov ax , bat_vy   
     sub bat_posy_left , ax  ;posy_up -= bat_vy (y coordinates are 0,0 top left)
@@ -231,7 +229,6 @@ ret
 userRHSinput endp
 
 movebatupRHS proc
-  
     cmp bat_posy_right , 0  ;clamp position to zero
     je  exitmovebatupRHS
     mov ax , bat_vy  
@@ -252,6 +249,35 @@ movebatdownRHS proc
 exitmovebatdownRHS:
     ret
 movebatdownRHS endp
+
+checkcollision proc
+
+    ;;prevent ball going below screen
+    mov ax, screenheight
+    sub ax , ball_dimension
+    cmp ball_posy , ax  ;check if (ballposy < screenheight - ball_dimension)
+    jl collidetop
+    mov ax,ball_vy
+    mov bx,-1   
+    imul bx     ;flip the velocity,this gets stored in ax
+    mov ball_vy,ax    ;realod back into ball posy
+
+collidetop:
+   ;;prevent ball going above screen
+   mov ax , 0      
+   cmp ball_posy, ax
+   jg exitcheckcollision
+   mov ax, ball_vy
+   mov bx, -1
+   imul bx
+   mov ball_vy,ax
+
+
+exitcheckcollision:
+ret
+checkcollision endp
+
+ 
 
 clearscreen proc ;clear screen
     mov ah,00h
