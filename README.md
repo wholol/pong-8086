@@ -1,4 +1,4 @@
-# Pong-8086
+# Pong-8086 (WIP!)
 pong game in x86 assembly (8086). Player 1 uses w and a keys, Player 2 uses o and l keys to move the bat.
 
 ## Dependencies  
