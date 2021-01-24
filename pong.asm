@@ -2,17 +2,22 @@
 .stack 100h
 
 .data
-message db "hello world",0dh,0ah,'$'
 ball_posx dw 0a0h    ;ball position x
 ball_posy dw 0a0h    ;ball pos y
+ball_resetposx dw 0a0h 
+ball_resetposy dw 0a0h 
 ball_dimension dw 05h    ; 5 x 5 pixels
 ball_vx dw 01h  ;velocity of x pos
 ball_vy dw 01h  ;velocity of y pos
 ball_color db 0eh
 
-;according to video specs
+;according to video specs (int 10h)
 screenwidth dw 320
 screenheight dw 200
+
+;player scores
+left_player_score dw 0
+right_player_score dw 0 
 
 ;bat dimensions
 bat_width dw 10
@@ -29,6 +34,7 @@ bat_posx_right dw 310  ;pos x = width for left handside = (screenwidth - bat_wid
 bat_posy_right dw 75    ;initialize bat to center of screen (screenheight - height) / 2
 
 counter dw 0            ;coutner fro game loop delay
+
 .code 
 
 main proc 
@@ -46,7 +52,8 @@ gameloop:
         call renderball     ;render ball
         call renderbatLHS   ;render lhs bat
         call renderbatRHS   ;render rhs bat
-        
+        call userLHSinput   
+        call userRHSinput
         jmp update_delay
 
     ;while(not quit)
@@ -56,13 +63,14 @@ gameloop:
     ;check quit()
     update:
         mov counter , 0
-        call userLHSinput   
-        call userRHSinput
-        call moveball
         call collisionbatRHS
            ;check colision agaisnt right bat
         call collisionbatLHS   ;check collision against left bat
         call wallcollisioncheck ;check collision against wall
+        call moveball
+        call resetball
+        
+
         call clearscreen
         jmp gameloop
 main endp
@@ -337,8 +345,8 @@ collisionbatRHS endp
 collisionbatLHS proc   ;check collsiino for left bat
    ;first compare xpos
    mov ax, ball_posx
-   inc ax
-   cmp bat_posx_left,ax    ;if (batposx_left == ballposx + 1)
+   dec ax
+   cmp bat_posx_left,ax    ;if (batposx_left == ballposx - 1)
    jne exithitleft
    jmp checkupperboundleft
 
@@ -366,6 +374,43 @@ hitleftbat:
 exithitleft:
 ret
 collisionbatLHS endp
+
+
+
+resetball proc  ;resets if the users misses
+
+call resetLHS
+
+resetLHS:
+    mov ax , bat_posx_left
+    cmp ball_posx , ax   
+    jl incrementscore_RHS        ;if ballposx < bat_posx_left, icnrement score of rght side palyer
+    jmp resetRHS
+
+incrementscore_RHS:
+inc right_player_score
+jmp resetballpos
+
+resetRHS:
+    mov ax , ball_posx
+    add ax , ball_dimension
+    cmp bat_posx_right , ax 
+    jle incrementscore_LHS    ; if ballposx + balldimensions >= bat_posx_right icnrement score of rght side palyer
+    jmp exitresetball
+
+incrementscore_LHS:
+inc left_player_score  
+jmp resetballpos
+
+resetballpos:       ;reset ball position
+    mov ax , ball_resetposx
+    mov ball_posx , ax
+    mov ax , ball_resetposy
+    mov ball_posy , ax
+
+exitresetball:
+ret
+resetball endp
 
 
 
