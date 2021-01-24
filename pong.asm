@@ -46,8 +46,7 @@ gameloop:
         call renderball     ;render ball
         call renderbatLHS   ;render lhs bat
         call renderbatRHS   ;render rhs bat
-        call userLHSinput   
-        call userRHSinput
+        
         jmp update_delay
 
     ;while(not quit)
@@ -57,12 +56,17 @@ gameloop:
     ;check quit()
     update:
         mov counter , 0
-        
+        call userLHSinput   
+        call userRHSinput
         call moveball
-        call checkcollision
+        call collisionbatRHS
+           ;check colision agaisnt right bat
+        call collisionbatLHS   ;check collision against left bat
+        call wallcollisioncheck ;check collision against wall
         call clearscreen
         jmp gameloop
 main endp
+
 
 
 renderball proc
@@ -100,6 +104,7 @@ ret
 renderball endp
 
 
+
 renderbatLHS proc ;render the left hand side bat
     mov dx , bat_posy_left  ;initialize ball position
     mov cx , bat_posx_left  ;iniitalize ball position
@@ -130,12 +135,11 @@ renderbat_y_left:
                jne renderbat_x_left ;if (cx != 0 (since bat pos is top right), repeat.)
                je renderbat_y_left  ;else go back to render y
 
-;render the right hand side bat
-    
-
 finishrenderbatLHS:
 ret
 renderbatLHS endp
+
+
 
 renderbatRHS proc  ;render the right hand side bat
     mov dx , bat_posy_right  ;initialize ball position
@@ -169,6 +173,8 @@ finishrenderbatRHS:
 ret
 renderbatRHS endp
 
+
+
 moveball proc
     mov ax,ball_vx  
     add ball_posx , ax  ;ballposx = ballposx + ball_vx
@@ -176,6 +182,8 @@ moveball proc
     add ball_posy,ax
     ret
 moveball endp
+
+
 
 userLHSinput proc
 
@@ -195,6 +203,8 @@ exitLHSinput:
 ret
 userLHSinput endp
 
+
+
 movebatupLHS proc   
     cmp bat_posy_left , 0   ;if (batpost == 0)
     je exitmovebatupLHS
@@ -204,6 +214,8 @@ movebatupLHS proc
 exitmovebatupLHS:
     ret
 movebatupLHS endp
+
+
 
 movebatdownLHS proc
     mov ax , screenheight   
@@ -217,6 +229,8 @@ exitmovebatdownLHS:
     ret
 movebatdownLHS endp
 
+
+
 userRHSinput proc
     cmp al, 06fh    ;077h = ascii for 'o'
     je  movebatupRHS
@@ -228,6 +242,8 @@ exitRHSinput:
 ret
 userRHSinput endp
 
+
+
 movebatupRHS proc
     cmp bat_posy_right , 0  ;clamp position to zero
     je  exitmovebatupRHS
@@ -237,6 +253,8 @@ movebatupRHS proc
 exitmovebatupRHS:
     ret
 movebatupRHS endp
+
+
 
 movebatdownRHS proc
     mov ax , screenheight   
@@ -250,9 +268,10 @@ exitmovebatdownRHS:
     ret
 movebatdownRHS endp
 
-checkcollision proc
 
-    ;;prevent ball going below screen
+
+wallcollisioncheck proc
+    ;prevent ball going below screen
     mov ax, screenheight
     sub ax , ball_dimension
     cmp ball_posy , ax  ;check if (ballposy < screenheight - ball_dimension)
@@ -266,18 +285,89 @@ collidetop:
    ;;prevent ball going above screen
    mov ax , 0      
    cmp ball_posy, ax
-   jg exitcheckcollision
+   jg exitwallcollisioncheck
    mov ax, ball_vy
    mov bx, -1
    imul bx
    mov ball_vy,ax
 
 
-exitcheckcollision:
+exitwallcollisioncheck:
 ret
-checkcollision endp
+wallcollisioncheck endp
 
- 
+
+
+collisionbatRHS proc
+   ;first compare xpos
+   mov ax, ball_posx
+   add ax , ball_dimension
+   inc ax
+   cmp bat_posx_right,ax    ;if (batposx_right == ballposx + ball_dimension + 1)
+   jne exithitright
+   jmp checkupperboundright
+
+checkupperboundright:            ;ballposy < bat_height + batposy for collision
+    mov ax,bat_posy_right
+    add ax , bat_height
+    cmp ball_posy , ax   
+    jl checklowerboundright
+    jmp exithitright         ;if ballposy > bat_height + bat_width, no hit.
+
+checklowerboundright:    ;ballposy + ball dimensions > bat pos y as well for collision
+    mov ax , ball_posy      
+    add ax , ball_dimension ;ballposy + ball dimensions
+    cmp bat_posy_right , ax  
+    jl hitrightbat           ;if its greater, it means the bat has hit it.
+    jg exithitright
+
+hitrightbat:
+     mov ax,ball_vx
+     mov bx,-1   
+     imul bx            ;flip the velocity,this gets stored in ax
+     mov ball_vx,ax    ;realod back into ball posy
+     jmp exithitright
+
+exithitright:
+ret
+collisionbatRHS endp
+
+
+
+collisionbatLHS proc   ;check collsiino for left bat
+   ;first compare xpos
+   mov ax, ball_posx
+   inc ax
+   cmp bat_posx_left,ax    ;if (batposx_left == ballposx + 1)
+   jne exithitleft
+   jmp checkupperboundleft
+
+checkupperboundleft:            ;ballposy < bat_height + batposy for collision
+    mov ax,bat_posy_left
+    add ax , bat_height
+    cmp ball_posy , ax   
+    jl checklowerboundleft
+    jmp exithitleft         ;if ballposy > bat_height + bat_width, no hit.
+
+checklowerboundleft:    ;ballposy + ball dimensions > batposy as well for collision
+    mov ax , ball_posy      
+    add ax , ball_dimension ;ballposy + ball dimensions
+    cmp bat_posy_left , ax  
+    jl hitleftbat           ;if its greater, it means the bat has hit it.
+    jg exithitleft
+
+hitleftbat:
+     mov ax,ball_vx
+     mov bx,-1   
+     imul bx            ;flip the velocity,this gets stored in ax
+     mov ball_vx,ax    ;realod back into ball posy
+     jmp exithitleft
+
+exithitleft:
+ret
+collisionbatLHS endp
+
+
 
 clearscreen proc ;clear screen
     mov ah,00h
